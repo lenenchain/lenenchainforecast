@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>T04 오늘의 진짜 정보판</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --subtext: #475569;
+      --border: #e2e8f0;
+      --primary: #2563eb;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --success: #16a34a;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 850px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      font-family: monospace;
+    }
+    .badge-fresh { background: #dcfce7; color: var(--success); }
+    .badge-stale { background: #fef3c7; color: var(--warning); }
+    
+    .value-display {
+      font-size: 3.5rem;
+      font-weight: 800;
+      margin: 16px 0;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .unit { font-size: 1.5rem; color: var(--subtext); font-weight: 400; }
+    
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      background: var(--bg);
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+    }
+    .meta-item label { color: var(--subtext); display: block; font-size: 0.75rem; margin-bottom: 2px; }
+    .meta-item span { font-weight: 600; word-break: break-all; }
+
+    .error-box {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid var(--danger);
+      background: #fef2f2;
+      color: #991b1b;
+    }
+    .error-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .error-code-tag {
+      background: #fee2e2;
+      color: var(--danger);
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-family: monospace;
+    }
+
+    .test-panel {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    button {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+    button:hover { background: #f1f5f9; }
+    button.primary { background: var(--primary); color: #fff; border: none; }
+    button.primary:hover { background: #1d4ed8; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 10px;
+      text-align: left;
+    }
+    th { background: var(--bg); color: var(--subtext); font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="card">
+    <div class="header">
+      <h2>오늘의 진짜 정보판 (T04)</h2>
+      <span id="statusBadge" class="status-badge badge-fresh">FRESH / NONE</span>
+    </div>
+
+    <div class="value-display">
+      <span id="valDisplay">--.-</span>
+      <span class="unit" id="unitDisplay">--</span>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-item">
+        <label>출처 (Source Name)</label>
+        <span id="sourceDisplay">-</span>
+      </div>
+      <div class="meta-item">
+        <label>출처 관측 시각</label>
+        <span id="obsTimeDisplay">-</span>
+      </div>
+      <div class="meta-item">
+        <label>조회 시각 (fetched_at)</label>
+        <span id="fetchTimeDisplay">-</span>
+      </div>
+      <div class="meta-item">
+        <label>기준 시간대</label>
+        <span id="tzDisplay">Asia/Seoul</span>
+      </div>
+    </div>
+
+    <div id="errorAlert" class="error-box" style="display:none;">
+      <div class="error-header">
+        <strong id="errorTitle">오류 발생</strong>
+        <span id="errorCodeTag" class="error-code-tag">NONE</span>
+      </div>
+      <p id="errorDesc" style="margin: 4px 0 6px 0; font-size: 0.88rem;"></p>
+      <p id="errorNextAction" style="margin: 0 0 10px 0; font-size: 0.8rem; color: #b91c1c; font-weight: 500;"></p>
+      <button onclick="handleRetryAction()" style="background: var(--danger); color:#fff; border:none;">다시 시도 (Retry)</button>
+    </div>
+  </div>
+
+  <div class="card test-panel">
+    <h3>ALEPH Fixture 테스트 실행기 (v1.1.0)</h3>
+    <p style="font-size: 0.8rem; color: var(--subtext); margin: 4px 0 12px 0;">
+      업로드된 JSON Fixture 명세에 따른 결함 상태 모의 검증
+    </p>
+    
+    <div class="btn-group">
+      <button onclick="resetSyntheticState()" style="background:#e2e8f0;">[Reset]</button>
+      <button onclick="playFixture('T04-NORMAL-D1-A')">D1-A (100)</button>
+      <button onclick="playFixture('T04-NORMAL-D1-B')">D1-B (105)</button>
+      <button onclick="playFixture('T04-NORMAL-D2')">D2 (120)</button>
+      <button onclick="playFixture('T04-TIMEOUT')">TIMEOUT</button>
+      <button onclick="playFixture('T04-AUTH-401')">AUTH</button>
+      <button onclick="playFixture('T04-RATE-429')">RATE_LIMIT</button>
+      <button onclick="playFixture('T04-OFFLINE')">OFFLINE</button>
+      <button onclick="playFixture('T04-SCHEMA-BREAK')">SCHEMA_ERROR</button>
+      <button onclick="playFixture('T04-RECOVER-D2')" style="background: #22c55e; color: white; border: none;">RECOVER-D2</button>
+      <button onclick="fetchLiveOpenMeteo()" class="primary" style="margin-left:auto;">실제 라이브 API</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>일별 보존 기록 및 변화값 (Asia/Seoul)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>기록 날짜 (record_date)</th>
+          <th>원천 관측 시각</th>
+          <th>정규화 값 및 단위</th>
+          <th>전일 대비 변화 (Delta)</th>
+          <th>출처 URL</th>
+        </tr>
+      </thead>
+      <tbody id="historyTableBody">
+        <tr><td colspan="5" style="text-align: center; color: var(--subtext);">보존된 기록이 없습니다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  // JSON Fixture 명세 100% 동기화
+  const FIXTURES = {
+    "T04-NORMAL-D1-A": {
+      kind: "success",
+      payload: {
+        signal_id: "aleph-demo-index",
+        normalized_value: 100,
+        unit: "pt",
+        source_name: "ALEPH 결정론 replay",
+        source_url: "https://fixtures.aleph.invalid/t04/demo-index",
+        source_time: "2026-08-23T23:59:00.000Z",
+        fetched_at: "2026-08-24T00:00:00.000Z",
+        record_timezone: "Asia/Seoul",
+        record_date: "2026-08-24"
+      }
+    },
+    "T04-NORMAL-D1-B": {
+      kind: "success",
+      payload: {
+        signal_id: "aleph-demo-index",
+        normalized_value: 105,
+        unit: "pt",
+        source_name: "ALEPH 결정론 replay",
+        source_url: "https://fixtures.aleph.invalid/t04/demo-index",
+        source_time: null,
+        fetched_at: "2026-08-24T09:00:00.000Z",
+        record_timezone: "Asia/Seoul",
+        record_date: "2026-08-24"
+      }
+    },
+    "T04-NORMAL-D2": {
+      kind: "success",
+      payload: {
+        signal_id: "aleph-demo-index",
+        normalized_value: 120,
+        unit: "pt",
+        source_name: "ALEPH 결정론 replay",
+        source_url: "https://fixtures.aleph.invalid/t04/demo-index",
+        source_time: "2026-08-24T23:59:00.000Z",
+        fetched_at: "2026-08-25T00:00:00.000Z",
+        record_timezone: "Asia/Seoul",
+        record_date: "2026-08-25"
+      }
+    },
+    "T04-TIMEOUT": { 
+      kind: "failure", 
+      error_code: "timeout", 
+      title: "외부 출처 응답 지연 (timeout)", 
+      message: "제한시간보다 늦은 응답으로 인해 응답이 취소되었습니다.", 
+      action: "다음 행동: 네트워크 연결 상태를 확인 후 '다시 시도' 버튼을 클릭하세요." 
+    },
+    "T04-AUTH-401": { 
+      kind: "failure", 
+      error_code: "auth", 
+      title: "외부 출처 인증 거실 (auth)", 
+      message: "외부 출처 서버가 인증을 거절했습니다 (401 Unauthorized).", 
+      action: "다음 행동: API 자격 증명 또는 권한 설정을 확인하세요." 
+    },
+    "T04-RATE-429": { 
+      kind: "failure", 
+      error_code: "rate_limit", 
+      title: "호출 제한 초과 (rate_limit)", 
+      message: "외부 출처의 호출 제한에 도달했습니다 (429 Too Many Requests). Retry-After: 60s", 
+      action: "다음 행동: 60초 후 다시 시도를 진행해 주세요." 
+    },
+    "T04-OFFLINE": { 
+      kind: "failure", 
+      error_code: "offline", 
+      title: "네트워크 연결 중단 (offline)", 
+      message: "네트워크 연결이 오프라인 상태이거나 원천 도메인을 찾을 수 없습니다.", 
+      action: "다음 행동: 기기의 데이터/Wi-Fi 연결을 확인하세요." 
+    },
+    "T04-SCHEMA-BREAK": { 
+      kind: "success", // 파싱 시점에서 실패하도록 스키마 유효성 테스트용 페이로드 주입
+      payload: {
+        signal_id: "aleph-demo-index",
+        normalized_value: "105", // 숫자타입이어야 하지만 문자열로 전달되어 파싱 실패 유도
+        unit: "pt",
+        source_name: "ALEPH 결정론 replay",
+        source_url: "https://fixtures.aleph.invalid/t04/demo-index",
+        source_time: null,
+        fetched_at: "2026-08-24T10:04:00.000Z",
+        record_timezone: "Asia/Seoul",
+        record_date: "2026-08-24"
+      }
+    },
+    "T04-RECOVER-D2": {
+      kind: "success",
+      payload: {
+        signal_id: "aleph-demo-index",
+        normalized_value: 120,
+        unit: "pt",
+        source_name: "ALEPH 결정론 replay",
+        source_url: "https://fixtures.aleph.invalid/t04/demo-index",
+        source_time: "2026-08-24T23:59:00.000Z",
+        fetched_at: "2026-08-25T00:00:00.000Z",
+        record_timezone: "Asia/Seoul",
+        record_date: "2026-08-25"
+      }
+    }
+  };
+
+  let state = {
+    freshness: 'fresh',
+    errorCode: 'none',
+    errorDetails: null,
+    lastGoodReading: JSON.parse(localStorage.getItem('T04_LAST_GOOD_READING')) || null,
+    dailyStorage: JSON.parse(localStorage.getItem('T04_DAILY_STORAGE')) || {}
+  };
+
+  function kstDate(isoString) {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString.substring(0, 10);
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(d);
+    const byType = Object.fromEntries(parts.map(p => [p.type, p.value]));
+    return `${byType.year}-${byType.month}-${byType.day}`;
+  }
+
+  // Schema Validation (schema_error 판별)
+  function validateNormalizedReading(payload) {
+    if (!payload) return false;
+    if (typeof payload.normalized_value !== 'number' || isNaN(payload.normalized_value)) return false;
+    if (typeof payload.unit !== 'string' || !payload.unit) return false;
+    if (typeof payload.source_name !== 'string' || !payload.source_name) return false;
+    if (typeof payload.fetched_at !== 'string' || !payload.fetched_at) return false;
+    return true;
+  }
+
+  function processReadingSuccess(reading) {
+    // 엄격한 Schema 검증
+    if (!validateNormalizedReading(reading)) {
+      processReadingFailure({
+        error_code: "schema_error",
+        title: "응답 데이터 검증 실패 (schema_error)",
+        message: "normalized_value가 숫자(number) 타입이 아니거나 필수 표준 키가 누락되었습니다.",
+        action: "다음 행동: 정규화 파서 또는 스키마 매핑 로직을 교체하세요."
+      });
+      return;
+    }
+
+    const derivedRecordDate = kstDate(reading.fetched_at);
+
+    const normalized = {
+      signal_id: reading.signal_id || "aleph-demo-index",
+      normalized_value: reading.normalized_value,
+      unit: reading.unit,
+      source_name: reading.source_name,
+      source_url: reading.source_url,
+      source_time: reading.source_time,
+      fetched_at: reading.fetched_at,
+      record_timezone: "Asia/Seoul",
+      record_date: derivedRecordDate
+    };
+
+    state.freshness = 'fresh';
+    state.errorCode = 'none';
+    state.errorDetails = null;
+    state.lastGoodReading = normalized;
+
+    // 날짜별 키 저장소 (동일 날짜면 갱신)
+    const storageKey = `${normalized.signal_id}:${normalized.record_date}`;
+    state.dailyStorage[storageKey] = normalized;
+
+    localStorage.setItem('T04_LAST_GOOD_READING', JSON.stringify(normalized));
+    localStorage.setItem('T04_DAILY_STORAGE', JSON.stringify(state.dailyStorage));
+
+    hideError();
+    renderUI();
+  }
+
+  function processReadingFailure(errorObj) {
+    state.freshness = 'stale';
+    state.errorCode = errorObj.error_code;
+    state.errorDetails = errorObj;
+
+    showError(errorObj);
+    renderUI();
+  }
+
+  function playFixture(fixtureId) {
+    const fix = FIXTURES[fixtureId];
+    if (!fix) return;
+
+    if (fix.kind === 'success') {
+      processReadingSuccess(fix.payload);
+    } else {
+      processReadingFailure(fix);
+    }
+  }
+
+  function resetSyntheticState() {
+    state.freshness = 'fresh';
+    state.errorCode = 'none';
+    state.errorDetails = null;
+    state.lastGoodReading = null;
+    state.dailyStorage = {};
+    localStorage.removeItem('T04_LAST_GOOD_READING');
+    localStorage.removeItem('T04_DAILY_STORAGE');
+    hideError();
+    renderUI();
+  }
+
+  async function fetchLiveOpenMeteo() {
+    const liveUrl = "https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m&timezone=Asia%2FSeoul";
+    try {
+      const res = await fetch(liveUrl);
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          throw { error_code: 'auth', title: '접근 거부', message: '401/403 권한 거절이 발생했습니다.', action: '다음 행동: API 권한을 확인하세요.' };
+        }
+        if (res.status === 429) {
+          throw { error_code: 'rate_limit', title: '호출 제한', message: '429 요청 한도에 도달했습니다.', action: '다음 행동: 잠시 후 다시 시도하세요.' };
+        }
+        throw { error_code: 'offline', title: '연결 실패', message: `HTTP ${res.status} 에러가 발생했습니다.`, action: '다음 행동: 인터넷 연결을 확인하세요.' };
+      }
+      const data = await res.json();
+      const nowIso = new Date().toISOString();
+
+      const liveReading = {
+        signal_id: "live_seoul_temp",
+        normalized_value: data.current.temperature_2m,
+        unit: data.current_units.temperature_2m,
+        source_name: "Open-Meteo Live API",
+        source_url: liveUrl,
+        source_time: data.current.time + ":00Z",
+        fetched_at: nowIso,
+        record_timezone: "Asia/Seoul",
+        record_date: kstDate(nowIso)
+      };
+
+      processReadingSuccess(liveReading);
+    } catch (err) {
+      processReadingFailure(err.error_code ? err : {
+        error_code: 'offline',
+        title: '네트워크 연결 실패',
+        message: '원천 서버에 연결할 수 없습니다.',
+        action: '다음 행동: 네트워크 연결 상태를 확인하세요.'
+      });
+    }
+  }
+
+  function handleRetryAction() {
+    if (state.lastGoodReading && state.lastGoodReading.source_url.includes('aleph.invalid')) {
+      playFixture('T04-RECOVER-D2');
+    } else {
+      fetchLiveOpenMeteo();
+    }
+  }
+
+  function renderUI() {
+    const badge = document.getElementById('statusBadge');
+    badge.textContent = `${state.freshness.toUpperCase()} / ${state.errorCode}`;
+    badge.className = 'status-badge ' + (
+      state.freshness === 'fresh' ? 'badge-fresh' : 'badge-stale'
+    );
+
+    if (state.lastGoodReading) {
+      const r = state.lastGoodReading;
+      document.getElementById('valDisplay').textContent = r.normalized_value;
+      document.getElementById('unitDisplay').textContent = r.unit;
+      document.getElementById('sourceDisplay').textContent = r.source_name;
+      document.getElementById('obsTimeDisplay').textContent = r.source_time || '-';
+      document.getElementById('fetchTimeDisplay').textContent = r.fetched_at;
+      document.getElementById('tzDisplay').textContent = r.record_timezone;
+    } else {
+      document.getElementById('valDisplay').textContent = "--.-";
+      document.getElementById('unitDisplay').textContent = "--";
+    }
+
+    renderHistoryTable();
+  }
+
+  function renderHistoryTable() {
+    const tbody = document.getElementById('historyTableBody');
+    const records = Object.values(state.dailyStorage);
+
+    if (records.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--subtext);">보존된 기록이 없습니다.</td></tr>';
+      return;
+    }
+
+    records.sort((a, b) => a.record_date.localeCompare(b.record_date));
+
+    tbody.innerHTML = '';
+    records.forEach((rec, idx) => {
+      let diffText = '-';
+
+      if (idx > 0) {
+        const prevRec = records[idx - 1];
+        const diff = +(rec.normalized_value - prevRec.normalized_value).toFixed(2);
+        diffText = diff > 0 ? `+${diff} ${rec.unit}` : `${diff} ${rec.unit}`;
+      }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${rec.record_date}</strong></td>
+        <td>${rec.source_time || '-'}</td>
+        <td>${rec.normalized_value} ${rec.unit}</td>
+        <td style="color: ${diffText.startsWith('+') ? 'var(--danger)' : diffText.startsWith('-') ? 'var(--primary)' : 'inherit'}">${diffText}</td>
+        <td><a href="${rec.source_url}" target="_blank" style="font-size:0.75rem; color:var(--subtext);">[링크]</a></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function showError(errObj) {
+    document.getElementById('errorAlert').style.display = 'block';
+    document.getElementById('errorTitle').textContent = errObj.title;
+    document.getElementById('errorCodeTag').textContent = errObj.error_code;
+    document.getElementById('errorDesc').textContent = errObj.message;
+    document.getElementById('errorNextAction').textContent = errObj.action;
+  }
+
+  function hideError() {
+    document.getElementById('errorAlert').style.display = 'none';
+  }
+
+  if (state.lastGoodReading) {
+    renderUI();
+  } else {
+    playFixture('T04-NORMAL-D1-A');
+  }
+</script>
+
+</body>
+</html>
